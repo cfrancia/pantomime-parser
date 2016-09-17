@@ -1,4 +1,4 @@
-use primitives::{PrimitiveIterator, U4};
+use primitives::{PrimitiveIterator, U2, U4};
 
 use std::fs::File;
 use std::io::{Error as IoError, Read};
@@ -21,6 +21,8 @@ impl From<IoError> for ParserError {
 #[derive(Debug)]
 pub struct ClassFile {
     pub magic: U4,
+    pub minor_version: U2,
+    pub major_version: U2,
 }
 
 impl ClassFile {
@@ -28,8 +30,14 @@ impl ClassFile {
         let mut bytes = file.bytes();
 
         let magic = try!(bytes.next_u4());
+        let minor_version = try!(bytes.next_u2());
+        let major_version = try!(bytes.next_u2());
 
-        Ok(ClassFile { magic: magic })
+        Ok(ClassFile {
+            magic: magic,
+            minor_version: minor_version,
+            major_version: major_version,
+        })
     }
 }
 
@@ -53,6 +61,15 @@ mod tests {
         let classfile = ClassFile::from(test_file).unwrap();
 
         assert_that(&classfile.magic).is_equal_to(&0xCAFEBABE);
+    }
+
+    #[test]
+    fn can_successfully_parse_version() {
+        let test_file = open_test_resource("classfile/HelloWorld.class");
+        let classfile = ClassFile::from(test_file).unwrap();
+
+        assert_that(&classfile.minor_version).is_equal_to(&0);
+        assert_that(&classfile.major_version).is_equal_to(&52);
     }
 
     fn open_test_resource(resource_path: &str) -> File {
