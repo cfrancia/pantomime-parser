@@ -4,4 +4,4 @@ version = "0.1.0"
 authors = ["cfrancia <cfrancia@users.noreply.github.com>"]
 
 [dev-dependencies]
-spectral = "0.1.0"
+spectral = { git = "https://github.com/cfrancia/spectral" }
