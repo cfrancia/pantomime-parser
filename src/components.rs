@@ -1,10 +1,40 @@
 use super::{ParserError, ParserResult};
 use super::primitives::{PrimitiveIterator, U1, U2, U4};
 
+macro_rules! generate_constant_pool_retrieval_method {
+    ($variant_name:ident, $struct_name:ident, $method_name:ident) => {
+        pub fn $method_name(index: usize,
+                            constant_pool: &Vec<ConstantPoolItem>)
+            -> ParserResult<&$struct_name> {
+                let actual_index = ConstantPoolItem::shift_index(index);
+
+                if let Some(item) = constant_pool.get(actual_index) {
+                    match item {
+                        &ConstantPoolItem::$variant_name(ref val) => return Ok(val),
+                        item @ _ => {
+                            let name = item.to_friendly_name();
+                            return Err(ParserError::UnexpectedConstantPoolItem(name))
+                        }
+                    }
+                }
+
+                Err(ParserError::ConstantPoolIndexOutOfBounds(actual_index))
+            }
+
+    }
+}
+
 #[derive(Debug)]
 pub struct ClassInfo {
     tag: U1,
     name_index: U2,
+}
+
+#[derive(Debug)]
+pub struct Utf8Info {
+    tag: U1,
+    length: U2,
+    value: String,
 }
 
 #[derive(Debug)]
@@ -27,7 +57,7 @@ pub enum ConstantPoolItem {
         name_index: U2,
         descriptor_index: U2,
     },
-    Utf8 { tag: U1, length: U2, value: String },
+    Utf8(Utf8Info),
     MethodHandle {
         tag: U1,
         reference_kind: U1,
@@ -56,11 +86,11 @@ impl ConstantPoolItem {
 
                 let value = try!(String::from_utf8(byte_vec));
 
-                Ok(ConstantPoolItem::Utf8 {
+                Ok(ConstantPoolItem::Utf8(Utf8Info {
                     tag: tag,
                     length: length,
                     value: value,
-                })
+                }))
             }
             7 => {
                 Ok(ConstantPoolItem::Class(ClassInfo {
@@ -95,7 +125,7 @@ impl ConstantPoolItem {
     #[cfg_attr(rustfmt, rustfmt_skip)]
     pub fn to_friendly_name(&self) -> &'static str {
         match self {
-            &ConstantPoolItem::Utf8 { .. } => "Utf8",
+            &ConstantPoolItem::Utf8(..) => "Utf8",
             &ConstantPoolItem::Class(..) => "Class",
             &ConstantPoolItem::String { .. } => "String",
             &ConstantPoolItem::FieldOrMethodOrInterfaceMethod { .. } =>
@@ -105,25 +135,48 @@ impl ConstantPoolItem {
         }
     }
 
-    pub fn retrieve_class_info(index: usize,
-                               constant_pool: &Vec<ConstantPoolItem>)
-                               -> ParserResult<&ClassInfo> {
-        let actual_index = ConstantPoolItem::shift_index(index);
-
-        if let Some(item) = constant_pool.get(actual_index) {
-            match item {
-                &ConstantPoolItem::Class(ref class) => return Ok(class),
-                item @ _ => {
-                    return Err(ParserError::UnexpectedConstantPoolItem(item.to_friendly_name()))
-                }
-            }
-        }
-
-        Err(ParserError::ConstantPoolIndexOutOfBounds(actual_index))
-    }
+    generate_constant_pool_retrieval_method!(Class, ClassInfo, retrieve_class_info);
+    generate_constant_pool_retrieval_method!(Utf8, Utf8Info, retrieve_utf8_info);
 
     fn shift_index(unshifted_index: usize) -> usize {
         unshifted_index - 1 // references to the constant pool start from one
+    }
+}
+
+#[derive(Debug)]
+pub enum Attribute {
+    Unknown {
+        attribute_name: String,
+        info: Vec<U1>,
+    },
+}
+
+impl Attribute {
+    pub fn from<T: PrimitiveIterator>(iter: &mut T,
+                                      constant_pool: &Vec<ConstantPoolItem>)
+                                      -> ParserResult<Attribute> {
+        let attribute_name_index = try!(iter.next_u2());
+        let attribute_name =
+            try!(ConstantPoolItem::retrieve_utf8_info(attribute_name_index as usize,
+                                                      constant_pool))
+                .value
+                .clone();
+
+        let attribute_length = try!(iter.next_u4());
+
+        match attribute_name {
+            name @ _ => {
+                let mut info = vec![];
+                for _ in 0..attribute_length {
+                    info.push(try!(iter.next_u1()));
+                }
+
+                Ok(Attribute::Unknown {
+                    attribute_name: name,
+                    info: info,
+                })
+            }
+        }
     }
 }
 
