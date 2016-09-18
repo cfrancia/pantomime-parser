@@ -189,6 +189,45 @@ impl Attribute {
     }
 }
 
+#[derive(Debug)]
+pub struct Field {
+    access_flags: U2,
+    name: Rc<Utf8Info>,
+    descriptor: Rc<Utf8Info>,
+    attributes_count: U2,
+    attributes: Vec<Attribute>,
+}
+
+impl Field {
+    pub fn from<T: PrimitiveIterator>(iter: &mut T,
+                                      constant_pool: &Vec<ConstantPoolItem>)
+                                      -> ParserResult<Field> {
+        let access_flags = try!(iter.next_u2());
+
+        let name_index = try!(iter.next_u2());
+        let name = try!(ConstantPoolItem::retrieve_utf8_info(name_index as usize, constant_pool));
+
+        let descriptor_index = try!(iter.next_u2());
+        let descriptor = try!(ConstantPoolItem::retrieve_utf8_info(descriptor_index as usize,
+                                                                   constant_pool));
+
+        let attributes_count = try!(iter.next_u2());
+        let mut attributes = vec![];
+        for _ in 0..attributes_count {
+            attributes.push(try!(Attribute::from(iter, constant_pool)));
+        }
+
+        Ok(Field {
+            access_flags: access_flags,
+            name: name,
+            descriptor: descriptor,
+            attributes_count: attributes_count,
+            attributes: attributes,
+        })
+
+    }
+}
+
 pub struct AccessFlags;
 
 impl AccessFlags {

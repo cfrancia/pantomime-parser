@@ -1,4 +1,4 @@
-use components::ConstantPoolItem;
+use components::{ConstantPoolItem, Field};
 use primitives::{PrimitiveIterator, U1, U2, U4};
 
 use std::fs::File;
@@ -43,6 +43,8 @@ pub struct ClassFile {
     pub super_class: U2,
     pub interfaces_count: U2,
     pub interfaces: Vec<U2>,
+    pub fields_count: U2,
+    pub fields: Vec<Field>,
 }
 
 impl ClassFile {
@@ -69,6 +71,12 @@ impl ClassFile {
             interfaces.push(try!(bytes.next_u2()));
         }
 
+        let fields_count = try!(bytes.next_u2());
+        let mut fields = vec![];
+        for _ in 0..fields_count {
+            fields.push(try!(Field::from(&mut bytes, &constant_pool)));
+        }
+
         Ok(ClassFile {
             magic: magic,
             minor_version: minor_version,
@@ -80,6 +88,8 @@ impl ClassFile {
             super_class: super_class,
             interfaces_count: interfaces_count,
             interfaces: interfaces,
+            fields_count: fields_count,
+            fields: fields,
         })
     }
 }
@@ -160,6 +170,16 @@ mod tests {
         assert_that(&classfile.interfaces_count).is_equal_to(&0);
         assert_that(&classfile.interfaces).has_length(0);
     }
+
+    #[test]
+    fn can_successfully_parse_fields() {
+        let test_file = open_test_resource("classfile/HelloWorld.class");
+        let classfile = ClassFile::from(test_file).unwrap();
+
+        assert_that(&classfile.fields_count).is_equal_to(&0);
+        assert_that(&classfile.fields).has_length(0);
+    }
+
 
     fn open_test_resource(resource_path: &str) -> File {
         let mut file_path = PathBuf::from(MANIFEST_DIR);
