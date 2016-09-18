@@ -41,6 +41,8 @@ pub struct ClassFile {
     pub access_flags: U2,
     pub this_class: U2,
     pub super_class: U2,
+    pub interfaces_count: U2,
+    pub interfaces: Vec<U2>,
 }
 
 impl ClassFile {
@@ -61,6 +63,12 @@ impl ClassFile {
         let this_class = try!(bytes.next_u2());
         let super_class = try!(bytes.next_u2());
 
+        let interfaces_count = try!(bytes.next_u2());
+        let mut interfaces = vec![];
+        for _ in 0..interfaces_count {
+            interfaces.push(try!(bytes.next_u2()));
+        }
+
         Ok(ClassFile {
             magic: magic,
             minor_version: minor_version,
@@ -70,6 +78,8 @@ impl ClassFile {
             access_flags: access_flags,
             this_class: this_class,
             super_class: super_class,
+            interfaces_count: interfaces_count,
+            interfaces: interfaces,
         })
     }
 }
@@ -140,6 +150,15 @@ mod tests {
             .is_ok();
         assert_that(&ConstantPoolItem::retrieve_class_info(super_class as usize, &constant_pool))
             .is_ok();
+    }
+
+    #[test]
+    fn can_successfully_parse_interfaces() {
+        let test_file = open_test_resource("classfile/HelloWorld.class");
+        let classfile = ClassFile::from(test_file).unwrap();
+
+        assert_that(&classfile.interfaces_count).is_equal_to(&0);
+        assert_that(&classfile.interfaces).has_length(0);
     }
 
     fn open_test_resource(resource_path: &str) -> File {
