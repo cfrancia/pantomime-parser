@@ -1,8 +1,9 @@
-use components::{Attribute, ConstantPoolItem, Field, Method};
+use components::{Attribute, ConstantPoolItem, Field, Method, Utf8Info};
 use primitives::{PrimitiveIterator, U1, U2, U4};
 
 use std::fs::File;
 use std::io::{Error as IoError, Read};
+use std::rc::Rc;
 use std::string::FromUtf8Error;
 
 pub mod components;
@@ -114,7 +115,19 @@ impl ClassFile {
         })
     }
 
-    fn maybe_resolve_main_method(&self) -> Option<&Method> {
+    pub fn classname(&self) -> ParserResult<Rc<Utf8Info>> {
+        let this_class = self.this_class;
+        let constant_pool = &self.constant_pool;
+
+        let class_info = try!(ConstantPoolItem::retrieve_class_info(this_class as usize,
+                                                                    constant_pool));
+        let utf8_info = try!(ConstantPoolItem::retrieve_utf8_info(class_info.name_index as usize,
+                                                                  constant_pool));
+
+        Ok(utf8_info)
+    }
+
+    pub fn maybe_resolve_main_method(&self) -> Option<&Method> {
         for method in &self.methods {
             if method.name.eq("main") {
                 return Some(method);
@@ -249,6 +262,16 @@ mod tests {
 
         assert_that(&classfile.maybe_resolve_main_method()).is_some();
     }
+
+    #[test]
+    fn can_retrieve_classname() {
+        let test_file = open_test_resource("classfile/HelloWorld.class");
+        let classfile = ClassFile::from(test_file).unwrap();
+
+        let classname = classfile.classname().unwrap();
+        assert_that(&classname.to_string()).is_equal_to(&"HelloWorld".to_string());
+    }
+
 
     fn open_test_resource(resource_path: &str) -> File {
         let mut file_path = PathBuf::from(MANIFEST_DIR);
