@@ -36,6 +36,7 @@ pub struct ClassFile {
     pub major_version: U2,
     pub constant_pool_count: U2,
     pub constant_pool: Vec<ConstantPoolItem>,
+    pub access_flags: U2,
 }
 
 impl ClassFile {
@@ -52,12 +53,15 @@ impl ClassFile {
             constant_pool.push(try!(ConstantPoolItem::from(&mut bytes)));
         }
 
+        let access_flags = try!(bytes.next_u2());
+
         Ok(ClassFile {
             magic: magic,
             minor_version: minor_version,
             major_version: major_version,
             constant_pool_count: constant_pool_count,
             constant_pool: constant_pool,
+            access_flags: access_flags,
         })
     }
 }
@@ -70,6 +74,7 @@ mod tests {
     use self::spectral::prelude::*;
 
     use super::ClassFile;
+    use super::components::AccessFlags;
 
     use std::fs::File;
     use std::path::PathBuf;
@@ -100,6 +105,16 @@ mod tests {
 
         assert_that(&classfile.constant_pool_count).is_equal_to(&26);
         assert_that(&classfile.constant_pool).has_length(25);
+    }
+
+    #[test]
+    fn can_successfully_parse_access_flags() {
+        let test_file = open_test_resource("classfile/HelloWorld.class");
+        let classfile = ClassFile::from(test_file).unwrap();
+
+        let access_flags = classfile.access_flags;
+        asserting("class is public").that(&access_flags).matches(|val| AccessFlags::is_public(*val));
+        asserting("class is super").that(&access_flags).matches(|val| AccessFlags::is_super(*val));
     }
 
 

@@ -86,3 +86,40 @@ impl ConstantPoolItem {
         }
     }
 }
+
+pub struct AccessFlags;
+
+impl AccessFlags {
+    pub fn is_public(access_flags: U2) -> bool {
+        (access_flags & 0x0001) != 0
+    }
+
+    pub fn is_final(access_flags: U2) -> bool {
+        (access_flags & 0x0010) != 0
+    }
+
+    pub fn is_super(access_flags: U2) -> bool {
+        (access_flags & 0x0020) != 0
+    }
+
+    pub fn is_interface(access_flags: U2) -> bool {
+        (access_flags & 0x0200) != 0
+    }
+
+    pub fn is_abstract(access_flags: U2) -> bool {
+        (access_flags & 0x0400) != 0
+    }
+
+    pub fn is_synthetic(access_flags: U2) -> bool {
+        (access_flags & 0x1000) != 0
+    }
+
+    pub fn is_annotation(access_flags: U2) -> bool {
+        (access_flags & 0x2000) != 0
+    }
+
+    pub fn is_enum(access_flags: U2) -> bool {
+        (access_flags & 0x4000) != 0
+    }
+
+}
