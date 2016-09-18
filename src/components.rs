@@ -2,8 +2,14 @@ use super::{ParserError, ParserResult};
 use super::primitives::{PrimitiveIterator, U1, U2, U4};
 
 #[derive(Debug)]
+pub struct ClassInfo {
+    tag: U1,
+    name_index: U2,
+}
+
+#[derive(Debug)]
 pub enum ConstantPoolItem {
-    Class { tag: U1, name_index: U2 },
+    Class(ClassInfo),
     FieldOrMethodOrInterfaceMethod {
         tag: U1,
         class_index: U2,
@@ -57,10 +63,10 @@ impl ConstantPoolItem {
                 })
             }
             7 => {
-                Ok(ConstantPoolItem::Class {
+                Ok(ConstantPoolItem::Class(ClassInfo {
                     tag: tag,
                     name_index: try!(iter.next_u2()),
-                })
+                }))
             }
             8 => {
                 Ok(ConstantPoolItem::String {
@@ -84,6 +90,40 @@ impl ConstantPoolItem {
             }
             _ => Err(ParserError::UnknownConstantPoolTag(tag)),
         }
+    }
+
+    #[cfg_attr(rustfmt, rustfmt_skip)]
+    pub fn to_friendly_name(&self) -> &'static str {
+        match self {
+            &ConstantPoolItem::Utf8 { .. } => "Utf8",
+            &ConstantPoolItem::Class(..) => "Class",
+            &ConstantPoolItem::String { .. } => "String",
+            &ConstantPoolItem::FieldOrMethodOrInterfaceMethod { .. } =>
+                "Field|Method|InterfaceMethod",
+            &ConstantPoolItem::NameAndType { .. } => "NameAndType",
+            _ => "Not yet implemented",
+        }
+    }
+
+    pub fn retrieve_class_info(index: usize,
+                               constant_pool: &Vec<ConstantPoolItem>)
+                               -> ParserResult<&ClassInfo> {
+        let actual_index = ConstantPoolItem::shift_index(index);
+
+        if let Some(item) = constant_pool.get(actual_index) {
+            match item {
+                &ConstantPoolItem::Class(ref class) => return Ok(class),
+                item @ _ => {
+                    return Err(ParserError::UnexpectedConstantPoolItem(item.to_friendly_name()))
+                }
+            }
+        }
+
+        Err(ParserError::ConstantPoolIndexOutOfBounds(actual_index))
+    }
+
+    fn shift_index(unshifted_index: usize) -> usize {
+        unshifted_index - 1 // references to the constant pool start from one
     }
 }
 
@@ -121,5 +161,4 @@ impl AccessFlags {
     pub fn is_enum(access_flags: U2) -> bool {
         (access_flags & 0x4000) != 0
     }
-
 }

@@ -13,6 +13,8 @@ pub type ParserResult<T> = Result<T, ParserError>;
 #[derive(Debug)]
 pub enum ParserError {
     UnknownConstantPoolTag(U1),
+    UnexpectedConstantPoolItem(&'static str),
+    ConstantPoolIndexOutOfBounds(usize),
     InvalidUtf8(FromUtf8Error),
     Io(IoError),
 }
@@ -37,6 +39,8 @@ pub struct ClassFile {
     pub constant_pool_count: U2,
     pub constant_pool: Vec<ConstantPoolItem>,
     pub access_flags: U2,
+    pub this_class: U2,
+    pub super_class: U2,
 }
 
 impl ClassFile {
@@ -54,6 +58,8 @@ impl ClassFile {
         }
 
         let access_flags = try!(bytes.next_u2());
+        let this_class = try!(bytes.next_u2());
+        let super_class = try!(bytes.next_u2());
 
         Ok(ClassFile {
             magic: magic,
@@ -62,6 +68,8 @@ impl ClassFile {
             constant_pool_count: constant_pool_count,
             constant_pool: constant_pool,
             access_flags: access_flags,
+            this_class: this_class,
+            super_class: super_class,
         })
     }
 }
@@ -74,7 +82,7 @@ mod tests {
     use self::spectral::prelude::*;
 
     use super::ClassFile;
-    use super::components::AccessFlags;
+    use super::components::{AccessFlags, ConstantPoolItem};
 
     use std::fs::File;
     use std::path::PathBuf;
@@ -113,10 +121,26 @@ mod tests {
         let classfile = ClassFile::from(test_file).unwrap();
 
         let access_flags = classfile.access_flags;
-        asserting("class is public").that(&access_flags).matches(|val| AccessFlags::is_public(*val));
+        asserting("class is public")
+            .that(&access_flags)
+            .matches(|val| AccessFlags::is_public(*val));
         asserting("class is super").that(&access_flags).matches(|val| AccessFlags::is_super(*val));
     }
 
+    #[test]
+    fn can_successfully_parse_class_references() {
+        let test_file = open_test_resource("classfile/HelloWorld.class");
+        let classfile = ClassFile::from(test_file).unwrap();
+
+        let this_class = classfile.this_class;
+        let super_class = classfile.super_class;
+        let constant_pool = classfile.constant_pool;
+
+        assert_that(&ConstantPoolItem::retrieve_class_info(this_class as usize, &constant_pool))
+            .is_ok();
+        assert_that(&ConstantPoolItem::retrieve_class_info(super_class as usize, &constant_pool))
+            .is_ok();
+    }
 
     fn open_test_resource(resource_path: &str) -> File {
         let mut file_path = PathBuf::from(MANIFEST_DIR);
