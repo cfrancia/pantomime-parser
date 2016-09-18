@@ -123,7 +123,7 @@ mod tests {
     use self::spectral::prelude::*;
 
     use super::ClassFile;
-    use super::components::{AccessFlags, ConstantPoolItem};
+    use super::components::{Attribute, AccessFlags, ConstantPoolItem};
 
     use std::fs::File;
     use std::path::PathBuf;
@@ -212,6 +212,15 @@ mod tests {
             .mapped_contains(|val| &**val.name, &"<init>")
             .mapped_contains(|val| &**val.name, &"main")
             .mapped_contains(|val| &**val.name, &"println");
+
+        let method_attributes: Vec<_> =
+            classfile.methods.iter().flat_map(|val| &val.attributes).collect();
+        asserting("at least one method has the code attribute")
+            .that(&method_attributes)
+            .matching_contains(|val| match val {
+                &&Attribute::Code(..) => true,
+                _ => false,
+            });
     }
 
     #[test]

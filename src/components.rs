@@ -155,7 +155,85 @@ impl ConstantPoolItem {
 }
 
 #[derive(Debug)]
+pub struct CodeAttribute {
+    pub attribute_name: Rc<Utf8Info>,
+    pub max_stack: U2,
+    pub max_locals: U2,
+    pub code_length: U4,
+    pub code: Vec<U1>,
+    pub exception_table_length: U2,
+    pub exception_table: Vec<ExceptionHandler>,
+    pub attributes_count: U2,
+    pub attributes: Vec<Attribute>,
+}
+
+impl CodeAttribute {
+    pub fn from<T: PrimitiveIterator>(attribute_name: Rc<Utf8Info>,
+                                      iter: &mut T,
+                                      constant_pool: &Vec<ConstantPoolItem>)
+                                      -> ParserResult<CodeAttribute> {
+        let max_stack = try!(iter.next_u2());
+        let max_locals = try!(iter.next_u2());
+
+        let code_length = try!(iter.next_u4());
+        let mut code = vec![];
+        for _ in 0..code_length {
+            code.push(try!(iter.next_u1()));
+        }
+
+        let exception_table_length = try!(iter.next_u2());
+        let mut exception_table = vec![];
+        for _ in 0..exception_table_length {
+            exception_table.push(try!(ExceptionHandler::from(iter)));
+        }
+
+        let attributes_count = try!(iter.next_u2());
+        let mut attributes = vec![];
+        for _ in 0..attributes_count {
+            attributes.push(try!(Attribute::from(iter, constant_pool)));
+        }
+
+        Ok(CodeAttribute {
+            attribute_name: attribute_name,
+            max_stack: max_stack,
+            max_locals: max_locals,
+            code_length: code_length,
+            code: code,
+            exception_table_length: exception_table_length,
+            exception_table: exception_table,
+            attributes_count: attributes_count,
+            attributes: attributes,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct ExceptionHandler {
+    pub start_pc: U2,
+    pub end_pc: U2,
+    pub handler_pc: U2,
+    pub catch_type: U2,
+}
+
+impl ExceptionHandler {
+    pub fn from<T: PrimitiveIterator>(iter: &mut T) -> ParserResult<ExceptionHandler> {
+        let start_pc = try!(iter.next_u2());
+        let end_pc = try!(iter.next_u2());
+        let handler_pc = try!(iter.next_u2());
+        let catch_type = try!(iter.next_u2());
+
+        Ok(ExceptionHandler {
+            start_pc: start_pc,
+            end_pc: end_pc,
+            handler_pc: handler_pc,
+            catch_type: catch_type,
+        })
+    }
+}
+
+#[derive(Debug)]
 pub enum Attribute {
+    Code(Rc<CodeAttribute>),
     Unknown {
         attribute_name: Rc<Utf8Info>,
         info: Vec<U1>,
@@ -173,7 +251,12 @@ impl Attribute {
 
         let attribute_length = try!(iter.next_u4());
 
-        match *attribute_name {
+        match &**attribute_name {
+            "Code" => {
+                Ok(Attribute::Code(Rc::new(try!(CodeAttribute::from(attribute_name,
+                                                                    iter,
+                                                                    constant_pool)))))
+            }
             _ => {
                 let mut info = vec![];
                 for _ in 0..attribute_length {
