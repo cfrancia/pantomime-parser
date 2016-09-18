@@ -1,4 +1,4 @@
-use components::{ConstantPoolItem, Field};
+use components::{ConstantPoolItem, Field, Method};
 use primitives::{PrimitiveIterator, U1, U2, U4};
 
 use std::fs::File;
@@ -45,6 +45,21 @@ pub struct ClassFile {
     pub interfaces: Vec<U2>,
     pub fields_count: U2,
     pub fields: Vec<Field>,
+    pub methods_count: U2,
+    pub methods: Vec<Method>,
+}
+
+macro_rules! populate_vec {
+    ($length:ident, $supplier:expr) => {
+        {
+            let mut temp_vec = vec![];
+            for _ in 0..$length {
+                temp_vec.push(try!($supplier));
+            }
+
+            temp_vec
+        }
+    }
 }
 
 impl ClassFile {
@@ -56,26 +71,22 @@ impl ClassFile {
         let major_version = try!(bytes.next_u2());
 
         let constant_pool_count = try!(bytes.next_u2());
-        let mut constant_pool = vec![];
-        for _ in 1..constant_pool_count {
-            constant_pool.push(try!(ConstantPoolItem::from(&mut bytes)));
-        }
+        let actual_constant_pool_count = constant_pool_count - 1;
+        let constant_pool = populate_vec!(actual_constant_pool_count,
+                                          ConstantPoolItem::from(&mut bytes));
 
         let access_flags = try!(bytes.next_u2());
         let this_class = try!(bytes.next_u2());
         let super_class = try!(bytes.next_u2());
 
         let interfaces_count = try!(bytes.next_u2());
-        let mut interfaces = vec![];
-        for _ in 0..interfaces_count {
-            interfaces.push(try!(bytes.next_u2()));
-        }
+        let interfaces = populate_vec!(interfaces_count, bytes.next_u2());
 
         let fields_count = try!(bytes.next_u2());
-        let mut fields = vec![];
-        for _ in 0..fields_count {
-            fields.push(try!(Field::from(&mut bytes, &constant_pool)));
-        }
+        let fields = populate_vec!(fields_count, Field::from(&mut bytes, &constant_pool));
+
+        let methods_count = try!(bytes.next_u2());
+        let methods = populate_vec!(methods_count, Method::from(&mut bytes, &constant_pool));
 
         Ok(ClassFile {
             magic: magic,
@@ -90,6 +101,8 @@ impl ClassFile {
             interfaces: interfaces,
             fields_count: fields_count,
             fields: fields,
+            methods_count: methods_count,
+            methods: methods,
         })
     }
 }
@@ -178,6 +191,19 @@ mod tests {
 
         assert_that(&classfile.fields_count).is_equal_to(&0);
         assert_that(&classfile.fields).has_length(0);
+    }
+
+    #[test]
+    fn can_successfully_parse_methods() {
+        let test_file = open_test_resource("classfile/HelloWorld.class");
+        let classfile = ClassFile::from(test_file).unwrap();
+
+        assert_that(&classfile.methods_count).is_equal_to(&3);
+        assert_that(&classfile.methods)
+            .has_length(3)
+            .mapped_contains(|val| &**val.name, &"<init>")
+            .mapped_contains(|val| &**val.name, &"main")
+            .mapped_contains(|val| &**val.name, &"println");
     }
 
 

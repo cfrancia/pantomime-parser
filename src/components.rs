@@ -29,15 +29,15 @@ macro_rules! generate_constant_pool_retrieval_method {
 
 #[derive(Debug)]
 pub struct ClassInfo {
-    tag: U1,
-    name_index: U2,
+    pub tag: U1,
+    pub name_index: U2,
 }
 
 #[derive(Debug)]
 pub struct Utf8Info {
-    tag: U1,
-    length: U2,
-    value: String,
+    pub tag: U1,
+    pub length: U2,
+    pub value: String,
 }
 
 impl Deref for Utf8Info {
@@ -141,8 +141,8 @@ impl ConstantPoolItem {
             &ConstantPoolItem::String { .. } => "String",
             &ConstantPoolItem::FieldOrMethodOrInterfaceMethod { .. } =>
                 "Field|Method|InterfaceMethod",
-            &ConstantPoolItem::NameAndType { .. } => "NameAndType",
-            _ => "Not yet implemented",
+                &ConstantPoolItem::NameAndType { .. } => "NameAndType",
+                _ => "Not yet implemented",
         }
     }
 
@@ -189,44 +189,62 @@ impl Attribute {
     }
 }
 
-#[derive(Debug)]
-pub struct Field {
-    access_flags: U2,
-    name: Rc<Utf8Info>,
-    descriptor: Rc<Utf8Info>,
-    attributes_count: U2,
-    attributes: Vec<Attribute>,
-}
+macro_rules! generate_method_or_field_parser_impl {
+    ($impl_name:ident) => {
+        impl $impl_name {
+            pub fn from<T: PrimitiveIterator>(iter: &mut T,
+                                              constant_pool: &Vec<ConstantPoolItem>)
+                -> ParserResult<$impl_name> {
+                    let access_flags = try!(iter.next_u2());
 
-impl Field {
-    pub fn from<T: PrimitiveIterator>(iter: &mut T,
-                                      constant_pool: &Vec<ConstantPoolItem>)
-                                      -> ParserResult<Field> {
-        let access_flags = try!(iter.next_u2());
+                    let name_index = try!(iter.next_u2());
+                    let name = try!(ConstantPoolItem::retrieve_utf8_info(name_index as usize,
+                                                                         constant_pool));
 
-        let name_index = try!(iter.next_u2());
-        let name = try!(ConstantPoolItem::retrieve_utf8_info(name_index as usize, constant_pool));
+                    let descriptor_index = try!(iter.next_u2());
+                    let descriptor = try!(ConstantPoolItem::retrieve_utf8_info(
+                            descriptor_index as usize,
+                            constant_pool));
 
-        let descriptor_index = try!(iter.next_u2());
-        let descriptor = try!(ConstantPoolItem::retrieve_utf8_info(descriptor_index as usize,
-                                                                   constant_pool));
+                    let attributes_count = try!(iter.next_u2());
+                    let mut attributes = vec![];
+                    for _ in 0..attributes_count {
+                        attributes.push(try!(Attribute::from(iter, constant_pool)));
+                    }
 
-        let attributes_count = try!(iter.next_u2());
-        let mut attributes = vec![];
-        for _ in 0..attributes_count {
-            attributes.push(try!(Attribute::from(iter, constant_pool)));
+                    Ok($impl_name {
+                        access_flags: access_flags,
+                        name: name,
+                        descriptor: descriptor,
+                        attributes_count: attributes_count,
+                        attributes: attributes,
+                    })
+
+                }
         }
-
-        Ok(Field {
-            access_flags: access_flags,
-            name: name,
-            descriptor: descriptor,
-            attributes_count: attributes_count,
-            attributes: attributes,
-        })
-
     }
 }
+
+#[derive(Debug)]
+pub struct Field {
+    pub access_flags: U2,
+    pub name: Rc<Utf8Info>,
+    pub descriptor: Rc<Utf8Info>,
+    pub attributes_count: U2,
+    pub attributes: Vec<Attribute>,
+}
+
+#[derive(Debug)]
+pub struct Method {
+    pub access_flags: U2,
+    pub name: Rc<Utf8Info>,
+    pub descriptor: Rc<Utf8Info>,
+    pub attributes_count: U2,
+    pub attributes: Vec<Attribute>,
+}
+
+generate_method_or_field_parser_impl!(Field);
+generate_method_or_field_parser_impl!(Method);
 
 pub struct AccessFlags;
 
@@ -259,8 +277,20 @@ impl AccessFlags {
         (access_flags & 0x0040) != 0
     }
 
+    pub fn is_bridge(access_flags: U2) -> bool {
+        (access_flags & 0x0040) != 0
+    }
+
     pub fn is_transient(access_flags: U2) -> bool {
         (access_flags & 0x0080) != 0
+    }
+
+    pub fn is_varargs(access_flags: U2) -> bool {
+        (access_flags & 0x0080) != 0
+    }
+
+    pub fn is_native(access_flags: U2) -> bool {
+        (access_flags & 0x0100) != 0
     }
 
     pub fn is_interface(access_flags: U2) -> bool {
@@ -269,6 +299,10 @@ impl AccessFlags {
 
     pub fn is_abstract(access_flags: U2) -> bool {
         (access_flags & 0x0400) != 0
+    }
+
+    pub fn is_strict(access_flags: U2) -> bool {
+        (access_flags & 0x0800) != 0
     }
 
     pub fn is_synthetic(access_flags: U2) -> bool {
