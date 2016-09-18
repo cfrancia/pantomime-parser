@@ -187,12 +187,32 @@ impl AccessFlags {
         (access_flags & 0x0001) != 0
     }
 
+    pub fn is_private(access_flags: U2) -> bool {
+        (access_flags & 0x0002) != 0
+    }
+
+    pub fn is_protected(access_flags: U2) -> bool {
+        (access_flags & 0x0004) != 0
+    }
+
+    pub fn is_static(access_flags: U2) -> bool {
+        (access_flags & 0x0008) != 0
+    }
+
     pub fn is_final(access_flags: U2) -> bool {
         (access_flags & 0x0010) != 0
     }
 
     pub fn is_super(access_flags: U2) -> bool {
         (access_flags & 0x0020) != 0
+    }
+
+    pub fn is_volatile(access_flags: U2) -> bool {
+        (access_flags & 0x0040) != 0
+    }
+
+    pub fn is_transient(access_flags: U2) -> bool {
+        (access_flags & 0x0080) != 0
     }
 
     pub fn is_interface(access_flags: U2) -> bool {
