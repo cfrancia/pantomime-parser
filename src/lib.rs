@@ -113,6 +113,16 @@ impl ClassFile {
             attributes: attributes,
         })
     }
+
+    fn maybe_resolve_main_method(&self) -> Option<&Method> {
+        for method in &self.methods {
+            if method.name.eq("main") {
+                return Some(method);
+            }
+        }
+
+        None
+    }
 }
 
 #[cfg(test)]
@@ -230,6 +240,14 @@ mod tests {
 
         assert_that(&classfile.attributes_count).is_equal_to(&1);
         assert_that(&classfile.attributes).has_length(1);
+    }
+
+    #[test]
+    fn can_resolve_main_method_if_present() {
+        let test_file = open_test_resource("classfile/HelloWorld.class");
+        let classfile = ClassFile::from(test_file).unwrap();
+
+        assert_that(&classfile.maybe_resolve_main_method()).is_some();
     }
 
     fn open_test_resource(resource_path: &str) -> File {
