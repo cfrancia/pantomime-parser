@@ -1,4 +1,4 @@
-use components::{ConstantPoolItem, Field, Method};
+use components::{Attribute, ConstantPoolItem, Field, Method};
 use primitives::{PrimitiveIterator, U1, U2, U4};
 
 use std::fs::File;
@@ -31,6 +31,19 @@ impl From<FromUtf8Error> for ParserError {
     }
 }
 
+macro_rules! populate_vec {
+    ($length:ident, $supplier:expr) => {
+        {
+            let mut temp_vec = vec![];
+            for _ in 0..$length {
+                temp_vec.push(try!($supplier));
+            }
+
+            temp_vec
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct ClassFile {
     pub magic: U4,
@@ -47,19 +60,8 @@ pub struct ClassFile {
     pub fields: Vec<Field>,
     pub methods_count: U2,
     pub methods: Vec<Method>,
-}
-
-macro_rules! populate_vec {
-    ($length:ident, $supplier:expr) => {
-        {
-            let mut temp_vec = vec![];
-            for _ in 0..$length {
-                temp_vec.push(try!($supplier));
-            }
-
-            temp_vec
-        }
-    }
+    pub attributes_count: U2,
+    pub attributes: Vec<Attribute>,
 }
 
 impl ClassFile {
@@ -88,6 +90,10 @@ impl ClassFile {
         let methods_count = try!(bytes.next_u2());
         let methods = populate_vec!(methods_count, Method::from(&mut bytes, &constant_pool));
 
+        let attributes_count = try!(bytes.next_u2());
+        let attributes = populate_vec!(attributes_count,
+                                       Attribute::from(&mut bytes, &constant_pool));
+
         Ok(ClassFile {
             magic: magic,
             minor_version: minor_version,
@@ -103,6 +109,8 @@ impl ClassFile {
             fields: fields,
             methods_count: methods_count,
             methods: methods,
+            attributes_count: attributes_count,
+            attributes: attributes,
         })
     }
 }
@@ -206,6 +214,14 @@ mod tests {
             .mapped_contains(|val| &**val.name, &"println");
     }
 
+    #[test]
+    fn can_successfully_parse_class_attributes() {
+        let test_file = open_test_resource("classfile/HelloWorld.class");
+        let classfile = ClassFile::from(test_file).unwrap();
+
+        assert_that(&classfile.attributes_count).is_equal_to(&1);
+        assert_that(&classfile.attributes).has_length(1);
+    }
 
     fn open_test_resource(resource_path: &str) -> File {
         let mut file_path = PathBuf::from(MANIFEST_DIR);
