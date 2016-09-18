@@ -1,16 +1,19 @@
 use super::{ParserError, ParserResult};
 use super::primitives::{PrimitiveIterator, U1, U2, U4};
 
+use std::ops::Deref;
+use std::rc::Rc;
+
 macro_rules! generate_constant_pool_retrieval_method {
     ($variant_name:ident, $struct_name:ident, $method_name:ident) => {
         pub fn $method_name(index: usize,
                             constant_pool: &Vec<ConstantPoolItem>)
-            -> ParserResult<&$struct_name> {
+            -> ParserResult<Rc<$struct_name>> {
                 let actual_index = ConstantPoolItem::shift_index(index);
 
                 if let Some(item) = constant_pool.get(actual_index) {
                     match item {
-                        &ConstantPoolItem::$variant_name(ref val) => return Ok(val),
+                        &ConstantPoolItem::$variant_name(ref val) => return Ok(val.clone()),
                         item @ _ => {
                             let name = item.to_friendly_name();
                             return Err(ParserError::UnexpectedConstantPoolItem(name))
@@ -37,9 +40,17 @@ pub struct Utf8Info {
     value: String,
 }
 
+impl Deref for Utf8Info {
+    type Target = str;
+
+    fn deref(&self) -> &str {
+        &self.value
+    }
+}
+
 #[derive(Debug)]
 pub enum ConstantPoolItem {
-    Class(ClassInfo),
+    Class(Rc<ClassInfo>),
     FieldOrMethodOrInterfaceMethod {
         tag: U1,
         class_index: U2,
@@ -57,7 +68,7 @@ pub enum ConstantPoolItem {
         name_index: U2,
         descriptor_index: U2,
     },
-    Utf8(Utf8Info),
+    Utf8(Rc<Utf8Info>),
     MethodHandle {
         tag: U1,
         reference_kind: U1,
@@ -86,17 +97,17 @@ impl ConstantPoolItem {
 
                 let value = try!(String::from_utf8(byte_vec));
 
-                Ok(ConstantPoolItem::Utf8(Utf8Info {
+                Ok(ConstantPoolItem::Utf8(Rc::new(Utf8Info {
                     tag: tag,
                     length: length,
                     value: value,
-                }))
+                })))
             }
             7 => {
-                Ok(ConstantPoolItem::Class(ClassInfo {
+                Ok(ConstantPoolItem::Class(Rc::new(ClassInfo {
                     tag: tag,
                     name_index: try!(iter.next_u2()),
-                }))
+                })))
             }
             8 => {
                 Ok(ConstantPoolItem::String {
@@ -146,7 +157,7 @@ impl ConstantPoolItem {
 #[derive(Debug)]
 pub enum Attribute {
     Unknown {
-        attribute_name: String,
+        attribute_name: Rc<Utf8Info>,
         info: Vec<U1>,
     },
 }
@@ -158,21 +169,19 @@ impl Attribute {
         let attribute_name_index = try!(iter.next_u2());
         let attribute_name =
             try!(ConstantPoolItem::retrieve_utf8_info(attribute_name_index as usize,
-                                                      constant_pool))
-                .value
-                .clone();
+                                                      constant_pool));
 
         let attribute_length = try!(iter.next_u4());
 
-        match attribute_name {
-            name @ _ => {
+        match *attribute_name {
+            _ => {
                 let mut info = vec![];
                 for _ in 0..attribute_length {
                     info.push(try!(iter.next_u1()));
                 }
 
                 Ok(Attribute::Unknown {
-                    attribute_name: name,
+                    attribute_name: attribute_name,
                     info: info,
                 })
             }
