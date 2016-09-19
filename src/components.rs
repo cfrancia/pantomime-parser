@@ -34,9 +34,23 @@ pub struct ClassInfo {
 }
 
 #[derive(Debug)]
+pub struct FieldOrMethodOrInterfaceMethodInfo {
+    pub tag: U1,
+    pub class_index: U2,
+    pub name_and_type_index: U2,
+}
+
+#[derive(Debug)]
 pub struct StringInfo {
     pub tag: U1,
     pub string_index: U2,
+}
+
+#[derive(Debug)]
+pub struct NameAndTypeInfo {
+    pub tag: U1,
+    pub name_index: U2,
+    pub descriptor_index: U2,
 }
 
 #[derive(Debug)]
@@ -57,11 +71,7 @@ impl Deref for Utf8Info {
 #[derive(Debug)]
 pub enum ConstantPoolItem {
     Class(Rc<ClassInfo>),
-    FieldOrMethodOrInterfaceMethod {
-        tag: U1,
-        class_index: U2,
-        name_and_type_index: U2,
-    },
+    FieldOrMethodOrInterfaceMethod(Rc<FieldOrMethodOrInterfaceMethodInfo>),
     String(Rc<StringInfo>),
     IntegerOrFloat { tag: U1, bytes: U1 },
     LongOrDouble {
@@ -69,11 +79,7 @@ pub enum ConstantPoolItem {
         high_bytes: U4,
         low_bytes: U4,
     },
-    NameAndType {
-        tag: U1,
-        name_index: U2,
-        descriptor_index: U2,
-    },
+    NameAndType(Rc<NameAndTypeInfo>),
     Utf8(Rc<Utf8Info>),
     MethodHandle {
         tag: U1,
@@ -122,18 +128,19 @@ impl ConstantPoolItem {
                 })))
             }
             9 | 10 | 11 => {
-                Ok(ConstantPoolItem::FieldOrMethodOrInterfaceMethod {
+                Ok(ConstantPoolItem::FieldOrMethodOrInterfaceMethod(
+                        Rc::new(FieldOrMethodOrInterfaceMethodInfo {
                     tag: tag,
                     class_index: try!(iter.next_u2()),
                     name_and_type_index: try!(iter.next_u2()),
-                })
+                })))
             }
             12 => {
-                Ok(ConstantPoolItem::NameAndType {
+                Ok(ConstantPoolItem::NameAndType(Rc::new(NameAndTypeInfo {
                     tag: tag,
                     name_index: try!(iter.next_u2()),
                     descriptor_index: try!(iter.next_u2()),
-                })
+                })))
             }
             _ => Err(ParserError::UnknownConstantPoolTag(tag)),
         }
@@ -145,9 +152,9 @@ impl ConstantPoolItem {
             &ConstantPoolItem::Utf8(..) => "Utf8",
             &ConstantPoolItem::Class(..) => "Class",
             &ConstantPoolItem::String(..) => "String",
-            &ConstantPoolItem::FieldOrMethodOrInterfaceMethod { .. } =>
+            &ConstantPoolItem::FieldOrMethodOrInterfaceMethod(..) =>
                 "Field|Method|InterfaceMethod",
-                &ConstantPoolItem::NameAndType { .. } => "NameAndType",
+                &ConstantPoolItem::NameAndType(..) => "NameAndType",
                 _ => "Not yet implemented",
         }
     }
