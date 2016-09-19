@@ -170,6 +170,22 @@ impl ConstantPoolItem {
     generate_constant_pool_retrieval_method!(Class, ClassInfo, retrieve_class_info);
     generate_constant_pool_retrieval_method!(Utf8, Utf8Info, retrieve_utf8_info);
 
+    // TODO: Split the enum/struct into seperate variants
+    generate_constant_pool_retrieval_method!(FieldOrMethodOrInterfaceMethod,
+                                             FieldOrMethodOrInterfaceMethodInfo,
+                                             retrieve_field_info);
+    generate_constant_pool_retrieval_method!(FieldOrMethodOrInterfaceMethod,
+                                             FieldOrMethodOrInterfaceMethodInfo,
+                                             retrieve_method_info);
+    generate_constant_pool_retrieval_method!(FieldOrMethodOrInterfaceMethod,
+                                             FieldOrMethodOrInterfaceMethodInfo,
+                                             retrieve_interface_method_info);
+
+    generate_constant_pool_retrieval_method!(String, StringInfo, retrieve_string_info);
+    generate_constant_pool_retrieval_method!(NameAndType,
+                                             NameAndTypeInfo,
+                                             retrieve_name_and_type_info);
+
     fn shift_index(unshifted_index: usize) -> usize {
         unshifted_index - 1 // references to the constant pool start from one
     }
