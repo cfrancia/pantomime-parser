@@ -163,7 +163,7 @@ impl ConstantPoolItem {
                          constant_pool: &Vec<ConstantPoolItem>)
                          -> ParserResult<&ConstantPoolItem> {
         let actual_index = Self::shift_index(index);
-        return constant_pool.get(index)
+        return constant_pool.get(actual_index)
             .ok_or(ParserError::ConstantPoolIndexOutOfBounds(actual_index));
     }
 
