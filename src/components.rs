@@ -292,7 +292,7 @@ macro_rules! generate_method_or_field_parser_impl {
                     let attributes_count = try!(iter.next_u2());
                     let mut attributes = vec![];
                     for _ in 0..attributes_count {
-                        attributes.push(try!(Attribute::from(iter, constant_pool)));
+                        attributes.push(Rc::new(try!(Attribute::from(iter, constant_pool))));
                     }
 
                     Ok($impl_name {
@@ -314,7 +314,7 @@ pub struct Field {
     pub name: Rc<Utf8Info>,
     pub descriptor: Rc<Utf8Info>,
     pub attributes_count: U2,
-    pub attributes: Vec<Attribute>,
+    pub attributes: Vec<Rc<Attribute>>,
 }
 
 #[derive(Debug)]
@@ -323,7 +323,7 @@ pub struct Method {
     pub name: Rc<Utf8Info>,
     pub descriptor: Rc<Utf8Info>,
     pub attributes_count: U2,
-    pub attributes: Vec<Attribute>,
+    pub attributes: Vec<Rc<Attribute>>,
 }
 
 generate_method_or_field_parser_impl!(Field);

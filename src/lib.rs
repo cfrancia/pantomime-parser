@@ -45,6 +45,19 @@ macro_rules! populate_vec {
     }
 }
 
+macro_rules! rc_populate_vec {
+    ($length:ident, $supplier:expr) => {
+        {
+            let mut temp_vec = vec![];
+            for _ in 0..$length {
+                temp_vec.push(Rc::new(try!($supplier)));
+            }
+
+            temp_vec
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct ClassFile {
     pub magic: U4,
@@ -58,11 +71,11 @@ pub struct ClassFile {
     pub interfaces_count: U2,
     pub interfaces: Vec<U2>,
     pub fields_count: U2,
-    pub fields: Vec<Field>,
+    pub fields: Vec<Rc<Field>>,
     pub methods_count: U2,
-    pub methods: Vec<Method>,
+    pub methods: Vec<Rc<Method>>,
     pub attributes_count: U2,
-    pub attributes: Vec<Attribute>,
+    pub attributes: Vec<Rc<Attribute>>,
 }
 
 impl ClassFile {
@@ -86,14 +99,14 @@ impl ClassFile {
         let interfaces = populate_vec!(interfaces_count, bytes.next_u2());
 
         let fields_count = try!(bytes.next_u2());
-        let fields = populate_vec!(fields_count, Field::from(&mut bytes, &constant_pool));
+        let fields = rc_populate_vec!(fields_count, Field::from(&mut bytes, &constant_pool));
 
         let methods_count = try!(bytes.next_u2());
-        let methods = populate_vec!(methods_count, Method::from(&mut bytes, &constant_pool));
+        let methods = rc_populate_vec!(methods_count, Method::from(&mut bytes, &constant_pool));
 
         let attributes_count = try!(bytes.next_u2());
-        let attributes = populate_vec!(attributes_count,
-                                       Attribute::from(&mut bytes, &constant_pool));
+        let attributes = rc_populate_vec!(attributes_count,
+                                          Attribute::from(&mut bytes, &constant_pool));
 
         Ok(ClassFile {
             magic: magic,
@@ -127,10 +140,10 @@ impl ClassFile {
         Ok(utf8_info)
     }
 
-    pub fn maybe_resolve_main_method(&self) -> Option<&Method> {
+    pub fn maybe_resolve_main_method(&self) -> Option<Rc<Method>> {
         for method in &self.methods {
             if method.name.eq("main") {
-                return Some(method);
+                return Some(method.clone());
             }
         }
 
@@ -240,8 +253,8 @@ mod tests {
             classfile.methods.iter().flat_map(|val| &val.attributes).collect();
         asserting("at least one method has the code attribute")
             .that(&method_attributes)
-            .matching_contains(|val| match val {
-                &&Attribute::Code(..) => true,
+            .matching_contains(|val| match ***val {
+                Attribute::Code(..) => true,
                 _ => false,
             });
     }
