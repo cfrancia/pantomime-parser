@@ -34,6 +34,12 @@ pub struct ClassInfo {
 }
 
 #[derive(Debug)]
+pub struct StringInfo {
+    pub tag: U1,
+    pub string_index: U2,
+}
+
+#[derive(Debug)]
 pub struct Utf8Info {
     pub tag: U1,
     pub length: U2,
@@ -56,7 +62,7 @@ pub enum ConstantPoolItem {
         class_index: U2,
         name_and_type_index: U2,
     },
-    String { tag: U1, string_index: U2 },
+    String(Rc<StringInfo>),
     IntegerOrFloat { tag: U1, bytes: U1 },
     LongOrDouble {
         tag: U1,
@@ -110,10 +116,10 @@ impl ConstantPoolItem {
                 })))
             }
             8 => {
-                Ok(ConstantPoolItem::String {
+                Ok(ConstantPoolItem::String(Rc::new(StringInfo {
                     tag: tag,
                     string_index: try!(iter.next_u2()),
-                })
+                })))
             }
             9 | 10 | 11 => {
                 Ok(ConstantPoolItem::FieldOrMethodOrInterfaceMethod {
@@ -138,7 +144,7 @@ impl ConstantPoolItem {
         match self {
             &ConstantPoolItem::Utf8(..) => "Utf8",
             &ConstantPoolItem::Class(..) => "Class",
-            &ConstantPoolItem::String { .. } => "String",
+            &ConstantPoolItem::String(..) => "String",
             &ConstantPoolItem::FieldOrMethodOrInterfaceMethod { .. } =>
                 "Field|Method|InterfaceMethod",
                 &ConstantPoolItem::NameAndType { .. } => "NameAndType",
