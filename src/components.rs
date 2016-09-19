@@ -146,6 +146,14 @@ impl ConstantPoolItem {
         }
     }
 
+    pub fn retrieve_item(index: usize,
+                         constant_pool: &Vec<ConstantPoolItem>)
+                         -> ParserResult<&ConstantPoolItem> {
+        let actual_index = Self::shift_index(index);
+        return constant_pool.get(index)
+            .ok_or(ParserError::ConstantPoolIndexOutOfBounds(actual_index));
+    }
+
     generate_constant_pool_retrieval_method!(Class, ClassInfo, retrieve_class_info);
     generate_constant_pool_retrieval_method!(Utf8, Utf8Info, retrieve_utf8_info);
 
