@@ -141,8 +141,12 @@ impl ClassFile {
     }
 
     pub fn maybe_resolve_main_method(&self) -> Option<Rc<Method>> {
+        self.maybe_resolve_method(&"main")
+    }
+
+    pub fn maybe_resolve_method(&self, name: &str) -> Option<Rc<Method>> {
         for method in &self.methods {
-            if method.name.eq("main") {
+            if method.name.eq(name) {
                 return Some(method.clone());
             }
         }
