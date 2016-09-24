@@ -71,7 +71,9 @@ impl Deref for Utf8Info {
 #[derive(Debug)]
 pub enum ConstantPoolItem {
     Class(Rc<ClassInfo>),
-    FieldOrMethodOrInterfaceMethod(Rc<FieldOrMethodOrInterfaceMethodInfo>),
+    Field(Rc<FieldOrMethodOrInterfaceMethodInfo>),
+    Method(Rc<FieldOrMethodOrInterfaceMethodInfo>),
+    InterfaceMethod(Rc<FieldOrMethodOrInterfaceMethodInfo>),
     String(Rc<StringInfo>),
     IntegerOrFloat { tag: U1, bytes: U1 },
     LongOrDouble {
@@ -127,9 +129,22 @@ impl ConstantPoolItem {
                     string_index: try!(iter.next_u2()),
                 })))
             }
-            9 | 10 | 11 => {
-                Ok(ConstantPoolItem::FieldOrMethodOrInterfaceMethod(
-                        Rc::new(FieldOrMethodOrInterfaceMethodInfo {
+            9 => {
+                Ok(ConstantPoolItem::Field(Rc::new(FieldOrMethodOrInterfaceMethodInfo {
+                    tag: tag,
+                    class_index: try!(iter.next_u2()),
+                    name_and_type_index: try!(iter.next_u2()),
+                })))
+            }
+            10 => {
+                Ok(ConstantPoolItem::Method(Rc::new(FieldOrMethodOrInterfaceMethodInfo {
+                    tag: tag,
+                    class_index: try!(iter.next_u2()),
+                    name_and_type_index: try!(iter.next_u2()),
+                })))
+            }
+            11 => {
+                Ok(ConstantPoolItem::InterfaceMethod(Rc::new(FieldOrMethodOrInterfaceMethodInfo {
                     tag: tag,
                     class_index: try!(iter.next_u2()),
                     name_and_type_index: try!(iter.next_u2()),
@@ -152,10 +167,11 @@ impl ConstantPoolItem {
             &ConstantPoolItem::Utf8(..) => "Utf8",
             &ConstantPoolItem::Class(..) => "Class",
             &ConstantPoolItem::String(..) => "String",
-            &ConstantPoolItem::FieldOrMethodOrInterfaceMethod(..) =>
-                "Field|Method|InterfaceMethod",
-                &ConstantPoolItem::NameAndType(..) => "NameAndType",
-                _ => "Not yet implemented",
+            &ConstantPoolItem::Field(..) => "Field",
+            &ConstantPoolItem::Method(..) => "Method",
+            &ConstantPoolItem::InterfaceMethod(..) => "InterfaceMethod",
+            &ConstantPoolItem::NameAndType(..) => "NameAndType",
+            _ => "Not yet implemented",
         }
     }
 
@@ -169,18 +185,15 @@ impl ConstantPoolItem {
 
     generate_constant_pool_retrieval_method!(Class, ClassInfo, retrieve_class_info);
     generate_constant_pool_retrieval_method!(Utf8, Utf8Info, retrieve_utf8_info);
-
-    // TODO: Split the enum/struct into seperate variants
-    generate_constant_pool_retrieval_method!(FieldOrMethodOrInterfaceMethod,
+    generate_constant_pool_retrieval_method!(Field,
                                              FieldOrMethodOrInterfaceMethodInfo,
                                              retrieve_field_info);
-    generate_constant_pool_retrieval_method!(FieldOrMethodOrInterfaceMethod,
+    generate_constant_pool_retrieval_method!(Method,
                                              FieldOrMethodOrInterfaceMethodInfo,
                                              retrieve_method_info);
-    generate_constant_pool_retrieval_method!(FieldOrMethodOrInterfaceMethod,
+    generate_constant_pool_retrieval_method!(InterfaceMethod,
                                              FieldOrMethodOrInterfaceMethodInfo,
                                              retrieve_interface_method_info);
-
     generate_constant_pool_retrieval_method!(String, StringInfo, retrieve_string_info);
     generate_constant_pool_retrieval_method!(NameAndType,
                                              NameAndTypeInfo,
@@ -193,7 +206,6 @@ impl ConstantPoolItem {
 
 #[derive(Debug)]
 pub struct CodeAttribute {
-    pub attribute_name: Rc<Utf8Info>,
     pub max_stack: U2,
     pub max_locals: U2,
     pub code_length: U4,
@@ -205,8 +217,7 @@ pub struct CodeAttribute {
 }
 
 impl CodeAttribute {
-    pub fn from<T: PrimitiveIterator>(attribute_name: Rc<Utf8Info>,
-                                      iter: &mut T,
+    pub fn from<T: PrimitiveIterator>(iter: &mut T,
                                       constant_pool: &Vec<ConstantPoolItem>)
                                       -> ParserResult<CodeAttribute> {
         let max_stack = try!(iter.next_u2());
@@ -231,7 +242,6 @@ impl CodeAttribute {
         }
 
         Ok(CodeAttribute {
-            attribute_name: attribute_name,
             max_stack: max_stack,
             max_locals: max_locals,
             code_length: code_length,
@@ -289,11 +299,7 @@ impl Attribute {
         let attribute_length = try!(iter.next_u4());
 
         match &**attribute_name {
-            "Code" => {
-                Ok(Attribute::Code(Rc::new(try!(CodeAttribute::from(attribute_name,
-                                                                    iter,
-                                                                    constant_pool)))))
-            }
+            "Code" => Ok(Attribute::Code(Rc::new(try!(CodeAttribute::from(iter, constant_pool))))),
             _ => {
                 let mut info = vec![];
                 for _ in 0..attribute_length {
