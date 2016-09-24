@@ -6,10 +6,10 @@ use std::rc::Rc;
 
 macro_rules! generate_constant_pool_retrieval_method {
     ($variant_name:ident, $struct_name:ident, $method_name:ident) => {
-        pub fn $method_name(index: usize,
+        pub fn $method_name(index: U2,
                             constant_pool: &Vec<ConstantPoolItem>)
             -> ParserResult<Rc<$struct_name>> {
-                let actual_index = ConstantPoolItem::shift_index(index);
+                let actual_index = ConstantPoolItem::shift_index(index as usize);
 
                 if let Some(item) = constant_pool.get(actual_index) {
                     match item {
@@ -204,6 +204,22 @@ impl ConstantPoolItem {
     }
 }
 
+pub struct ConstantPoolResolver<'r> {
+    pub constant_pool: &'r Vec<ConstantPoolItem>,
+}
+
+impl<'r> ConstantPoolResolver<'r> {
+    pub fn resolve_string_constant(&self, index: U2) -> ParserResult<String> {
+        let string_info = try!(ConstantPoolItem::retrieve_string_info(index, &self.constant_pool));
+
+        let string_index = string_info.string_index;
+        let utf8_info = try!(ConstantPoolItem::retrieve_utf8_info(string_index,
+                                                                  &self.constant_pool));
+
+        Ok(utf8_info.to_string())
+    }
+}
+
 #[derive(Debug)]
 pub struct CodeAttribute {
     pub max_stack: U2,
@@ -292,9 +308,8 @@ impl Attribute {
                                       constant_pool: &Vec<ConstantPoolItem>)
                                       -> ParserResult<Attribute> {
         let attribute_name_index = try!(iter.next_u2());
-        let attribute_name =
-            try!(ConstantPoolItem::retrieve_utf8_info(attribute_name_index as usize,
-                                                      constant_pool));
+        let attribute_name = try!(ConstantPoolItem::retrieve_utf8_info(attribute_name_index,
+                                                                       constant_pool));
 
         let attribute_length = try!(iter.next_u4());
 
@@ -324,12 +339,12 @@ macro_rules! generate_method_or_field_parser_impl {
                     let access_flags = try!(iter.next_u2());
 
                     let name_index = try!(iter.next_u2());
-                    let name = try!(ConstantPoolItem::retrieve_utf8_info(name_index as usize,
+                    let name = try!(ConstantPoolItem::retrieve_utf8_info(name_index,
                                                                          constant_pool));
 
                     let descriptor_index = try!(iter.next_u2());
                     let descriptor = try!(ConstantPoolItem::retrieve_utf8_info(
-                            descriptor_index as usize,
+                            descriptor_index,
                             constant_pool));
 
                     let attributes_count = try!(iter.next_u2());

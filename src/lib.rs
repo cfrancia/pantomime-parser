@@ -1,4 +1,4 @@
-use components::{Attribute, ConstantPoolItem, Field, Method, Utf8Info};
+use components::{Attribute, ConstantPoolItem, ConstantPoolResolver, Field, Method, Utf8Info};
 use primitives::{PrimitiveIterator, U1, U2, U4};
 
 use std::fs::File;
@@ -132,9 +132,8 @@ impl ClassFile {
         let this_class = self.this_class;
         let constant_pool = &self.constant_pool;
 
-        let class_info = try!(ConstantPoolItem::retrieve_class_info(this_class as usize,
-                                                                    constant_pool));
-        let utf8_info = try!(ConstantPoolItem::retrieve_utf8_info(class_info.name_index as usize,
+        let class_info = try!(ConstantPoolItem::retrieve_class_info(this_class, constant_pool));
+        let utf8_info = try!(ConstantPoolItem::retrieve_utf8_info(class_info.name_index,
                                                                   constant_pool));
 
         Ok(utf8_info)
@@ -153,6 +152,10 @@ impl ClassFile {
 
         None
     }
+
+    pub fn constant_pool_resolver(&self) -> ConstantPoolResolver {
+        ConstantPoolResolver { constant_pool: &self.constant_pool }
+    }
 }
 
 #[cfg(test)]
@@ -164,6 +167,7 @@ mod tests {
 
     use super::ClassFile;
     use super::components::{Attribute, AccessFlags, ConstantPoolItem};
+    use super::primitives::U2;
 
     use std::fs::File;
     use std::path::PathBuf;
@@ -217,10 +221,8 @@ mod tests {
         let super_class = classfile.super_class;
         let constant_pool = classfile.constant_pool;
 
-        assert_that(&ConstantPoolItem::retrieve_class_info(this_class as usize, &constant_pool))
-            .is_ok();
-        assert_that(&ConstantPoolItem::retrieve_class_info(super_class as usize, &constant_pool))
-            .is_ok();
+        assert_that(&ConstantPoolItem::retrieve_class_info(this_class, &constant_pool)).is_ok();
+        assert_that(&ConstantPoolItem::retrieve_class_info(super_class, &constant_pool)).is_ok();
     }
 
     #[test]
@@ -289,6 +291,32 @@ mod tests {
         assert_that(&classname.to_string()).is_equal_to(&"HelloWorld".to_string());
     }
 
+    #[test]
+    fn can_resolve_string_from_constant_pool() {
+        let test_file = open_test_resource("classfile/HelloWorld.class");
+        let classfile = ClassFile::from(test_file).unwrap();
+
+        let resolver = classfile.constant_pool_resolver();
+
+        let string_indexes: Vec<U2> = classfile.constant_pool
+            .iter()
+            .enumerate()
+            .filter(|&(_, item)| {
+                return match item {
+                    &ConstantPoolItem::String(..) => true,
+                    _ => false,
+                };
+            })
+            .map(|(i, _)| (i + 1) as U2)
+            .collect();
+
+        let strings =
+            string_indexes.iter().map(|i| resolver.resolve_string_constant(*i).unwrap()).collect();
+
+        assert_that(&strings)
+            .has_length(1)
+            .contains(&"hello world".to_string());
+    }
 
     fn open_test_resource(resource_path: &str) -> File {
         let mut file_path = PathBuf::from(MANIFEST_DIR);
