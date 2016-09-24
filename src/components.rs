@@ -41,6 +41,12 @@ pub struct FieldOrMethodOrInterfaceMethodInfo {
 }
 
 #[derive(Debug)]
+pub struct IntegerOrFloatInfo {
+    pub tag: U1,
+    pub bytes: U4,
+}
+
+#[derive(Debug)]
 pub struct StringInfo {
     pub tag: U1,
     pub string_index: U2,
@@ -75,7 +81,8 @@ pub enum ConstantPoolItem {
     Method(Rc<FieldOrMethodOrInterfaceMethodInfo>),
     InterfaceMethod(Rc<FieldOrMethodOrInterfaceMethodInfo>),
     String(Rc<StringInfo>),
-    IntegerOrFloat { tag: U1, bytes: U1 },
+    Integer(Rc<IntegerOrFloatInfo>),
+    Float(Rc<IntegerOrFloatInfo>),
     LongOrDouble {
         tag: U1,
         high_bytes: U4,
@@ -115,6 +122,18 @@ impl ConstantPoolItem {
                     tag: tag,
                     length: length,
                     value: value,
+                })))
+            }
+            3 => {
+                Ok(ConstantPoolItem::Integer(Rc::new(IntegerOrFloatInfo {
+                    tag: tag,
+                    bytes: try!(iter.next_u4()),
+                })))
+            }
+            4 => {
+                Ok(ConstantPoolItem::Float(Rc::new(IntegerOrFloatInfo {
+                    tag: tag,
+                    bytes: try!(iter.next_u4()),
                 })))
             }
             7 => {
@@ -170,6 +189,8 @@ impl ConstantPoolItem {
             &ConstantPoolItem::Field(..) => "Field",
             &ConstantPoolItem::Method(..) => "Method",
             &ConstantPoolItem::InterfaceMethod(..) => "InterfaceMethod",
+            &ConstantPoolItem::Integer(..) => "Integer",
+            &ConstantPoolItem::Float(..) => "Float",
             &ConstantPoolItem::NameAndType(..) => "NameAndType",
             _ => "Not yet implemented",
         }
@@ -194,6 +215,8 @@ impl ConstantPoolItem {
     generate_constant_pool_retrieval_method!(InterfaceMethod,
                                              FieldOrMethodOrInterfaceMethodInfo,
                                              retrieve_interface_method_info);
+    generate_constant_pool_retrieval_method!(Integer, IntegerOrFloatInfo, retrieve_integer_info);
+    generate_constant_pool_retrieval_method!(Float, IntegerOrFloatInfo, retrieve_float_info);
     generate_constant_pool_retrieval_method!(String, StringInfo, retrieve_string_info);
     generate_constant_pool_retrieval_method!(NameAndType,
                                              NameAndTypeInfo,
