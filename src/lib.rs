@@ -88,8 +88,7 @@ impl ClassFile {
 
         let constant_pool_count = try!(bytes.next_u2());
         let actual_constant_pool_count = constant_pool_count - 1;
-        let constant_pool = populate_vec!(actual_constant_pool_count,
-                                          ConstantPoolItem::from(&mut bytes));
+        let constant_pool = try!(Self::build_constant_pool(actual_constant_pool_count, &mut bytes));
 
         let access_flags = try!(bytes.next_u2());
         let this_class = try!(bytes.next_u2());
@@ -155,6 +154,33 @@ impl ClassFile {
 
     pub fn constant_pool_resolver(&self) -> ConstantPoolResolver {
         ConstantPoolResolver { constant_pool: &self.constant_pool }
+    }
+
+    fn build_constant_pool<T: PrimitiveIterator>(constant_pool_count: U2,
+                                                 iter: &mut T)
+                                                 -> ParserResult<Vec<ConstantPoolItem>> {
+        let mut should_skip = false;
+        let mut constant_pool = vec![];
+
+        for _ in 0..constant_pool_count {
+            if should_skip {
+                should_skip = false;
+                continue;
+            }
+
+            let constant_pool_item = try!(ConstantPoolItem::from(iter));
+            match constant_pool_item {
+                item @ ConstantPoolItem::Long(..) |
+                item @ ConstantPoolItem::Double(..) => {
+                    should_skip = true;
+                    constant_pool.push(item);
+                    constant_pool.push(ConstantPoolItem::Empty);
+                }
+                item @ _ => constant_pool.push(item),
+            }
+        }
+
+        Ok(constant_pool)
     }
 }
 

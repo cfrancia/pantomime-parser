@@ -83,6 +83,7 @@ impl Deref for Utf8Info {
 
 #[derive(Debug)]
 pub enum ConstantPoolItem {
+    Empty,
     Class(Rc<ClassInfo>),
     Field(Rc<FieldOrMethodOrInterfaceMethodInfo>),
     Method(Rc<FieldOrMethodOrInterfaceMethodInfo>),
@@ -201,6 +202,7 @@ impl ConstantPoolItem {
     #[cfg_attr(rustfmt, rustfmt_skip)]
     pub fn to_friendly_name(&self) -> &'static str {
         match self {
+            &ConstantPoolItem::Empty => "Empty",
             &ConstantPoolItem::Utf8(..) => "Utf8",
             &ConstantPoolItem::Class(..) => "Class",
             &ConstantPoolItem::String(..) => "String",
