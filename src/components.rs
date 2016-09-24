@@ -47,6 +47,13 @@ pub struct IntegerOrFloatInfo {
 }
 
 #[derive(Debug)]
+pub struct LongOrDoubleInfo {
+    pub tag: U1,
+    pub high_bytes: U4,
+    pub low_bytes: U4,
+}
+
+#[derive(Debug)]
 pub struct StringInfo {
     pub tag: U1,
     pub string_index: U2,
@@ -83,11 +90,8 @@ pub enum ConstantPoolItem {
     String(Rc<StringInfo>),
     Integer(Rc<IntegerOrFloatInfo>),
     Float(Rc<IntegerOrFloatInfo>),
-    LongOrDouble {
-        tag: U1,
-        high_bytes: U4,
-        low_bytes: U4,
-    },
+    Long(Rc<LongOrDoubleInfo>),
+    Double(Rc<LongOrDoubleInfo>),
     NameAndType(Rc<NameAndTypeInfo>),
     Utf8(Rc<Utf8Info>),
     MethodHandle {
@@ -134,6 +138,20 @@ impl ConstantPoolItem {
                 Ok(ConstantPoolItem::Float(Rc::new(IntegerOrFloatInfo {
                     tag: tag,
                     bytes: try!(iter.next_u4()),
+                })))
+            }
+            5 => {
+                Ok(ConstantPoolItem::Long(Rc::new(LongOrDoubleInfo {
+                    tag: tag,
+                    high_bytes: try!(iter.next_u4()),
+                    low_bytes: try!(iter.next_u4()),
+                })))
+            }
+            6 => {
+                Ok(ConstantPoolItem::Double(Rc::new(LongOrDoubleInfo {
+                    tag: tag,
+                    high_bytes: try!(iter.next_u4()),
+                    low_bytes: try!(iter.next_u4()),
                 })))
             }
             7 => {
@@ -217,6 +235,8 @@ impl ConstantPoolItem {
                                              retrieve_interface_method_info);
     generate_constant_pool_retrieval_method!(Integer, IntegerOrFloatInfo, retrieve_integer_info);
     generate_constant_pool_retrieval_method!(Float, IntegerOrFloatInfo, retrieve_float_info);
+    generate_constant_pool_retrieval_method!(Long, LongOrDoubleInfo, retrieve_long_info);
+    generate_constant_pool_retrieval_method!(Double, LongOrDoubleInfo, retrieve_double_info);
     generate_constant_pool_retrieval_method!(String, StringInfo, retrieve_string_info);
     generate_constant_pool_retrieval_method!(NameAndType,
                                              NameAndTypeInfo,
