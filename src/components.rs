@@ -66,11 +66,17 @@ pub struct NameAndTypeInfo {
     pub descriptor_index: U2,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, Hash, PartialEq)]
 pub struct Utf8Info {
     pub tag: U1,
     pub length: U2,
     pub value: String,
+}
+
+impl Utf8Info {
+    pub fn as_str(&self) -> &str {
+        &self.value
+    }
 }
 
 impl Deref for Utf8Info {

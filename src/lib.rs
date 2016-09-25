@@ -144,7 +144,7 @@ impl ClassFile {
 
     pub fn maybe_resolve_method(&self, name: &str) -> Option<Rc<Method>> {
         for method in &self.methods {
-            if method.name.eq(name) {
+            if method.name.as_str().eq(name) {
                 return Some(method.clone());
             }
         }
